@@ -251,6 +251,47 @@ def montar(blocos):
         s[1].upper() != 'SUMÁRIO' and all(chave(x[1]) != chave(s[1]) for x in sumario[k + 1:]))]
     return saida, sumario, '\n'.join(plano)
 
+
+# artigo do ato que só aprova/promulga o texto anexo (decreto de tratado, DL da CLT, portaria do Código de Conduta)
+PROMULGA = re.compile(r'apens[oa]s? por cópia|cópia anexa|anex[oa]s? (?:a|ao) (?:este|presente) Decreto|'
+                      r'executad[oa]s? e cumprid[oa]s?|Fica aprovada a Consolidação|nos termos do Anexo', re.I)
+# fecho depois do último artigo: local e data, assinaturas, nota de publicação
+FECHO = re.compile(r'^(Bras[ií]lia|Rio de Janeiro|Porto Alegre|S[ãa]o Salvador|Feit[oa] em|Dad[oa] (e passad|no Pal)|'
+                   r'Em (fé|firmeza|testemunho) do qu[eê]|E, havendo|Este texto não substitui|Sala das Sessões|'
+                   r'Documento assinado|Centro de Informação|\* Adotad|Ministr[oa] |Desembargador|Conselheir[oa] |'
+                   r'.{0,90}da Independência)', re.I)
+ASSINATURA = re.compile(r'^(?!ANEXO)[A-ZÀ-Ú]{3,}(?: [A-ZÀ-Ú]{2,}){1,4}\.?(?: |$)')  # "FERNANDO HENRIQUE CARDOSO"
+PREAMBULO = re.compile(r'^(Considerando|O PRESIDENTE|A PRESIDENTE|O CONGRESSO|Os Estados|As Altas|Nós\b|Mensagem|'
+                       r'Vigência|Texto compilado|Regulamento|Vide|Conversão)', re.I)
+
+
+def recortar(blocos, inicio=None, anexos=False):
+    """Deixa só a redação da norma: tira ementa, considerandos, decreto promulgador, data e assinaturas.
+    inicio: regex do 1º bloco a manter (ex.: Preâmbulo da CF); anexos: mantém os ANEXOS que vêm após as assinaturas."""
+    textos = [''.join(t for t, _ in normaliza(b)).strip() for b in blocos]
+    vivos = [bool(''.join(t for t, f in normaliza(b) if 's' not in f).strip()) for b in blocos]
+    arts = [i for i, t in enumerate(textos) if vivos[i] and ARTIGO.match(t)]
+    if not arts:
+        return blocos
+    if inicio:
+        ini = next(i for i, t in enumerate(textos) if re.search(inicio, t))
+    else:
+        uns = [i for i in arts if ARTIGO.match(textos[i]).group(1) in ('1', 'I')]
+        ini = next((i for i in uns if not PROMULGA.search(textos[i])), uns[0] if uns else arts[0])
+        titulo = lambda t: (t and len(t) < 150 and not PREAMBULO.match(t)
+                            and not re.search(r'[.;:,]$|\(Arts?\.?\s*\d', t))
+        while ini > 0 and (titulo(textos[ini - 1]) or not textos[ini - 1]):  # TÍTULO I, CAPÍTULO I... logo acima
+            ini -= 1
+    # anexos (tabelas, quadros) só ficam quando a norma pede: anexos=True
+    fim = next((i for i in range(arts[-1] + 1, len(blocos))
+                if FECHO.match(textos[i]) or ASSINATURA.match(textos[i]) or re.match(r'ANEXO\b', textos[i])), len(blocos))
+    manter = list(range(ini, fim))
+    if anexos:
+        a = next((i for i in range(fim, len(blocos)) if re.match(r'ANEXO\b', textos[i])), len(blocos))
+        b = next((i for i in range(a, len(blocos)) if textos[i].startswith('Este texto não substitui')), len(blocos))
+        manter += range(a, b)
+    return [blocos[i] for i in manter if textos[i] not in ('', '*')]
+
 # ---------- por norma ----------
 
 
@@ -267,7 +308,7 @@ def processar(n):
     r = baixar(url)
     pdf = n.get('tipo') == 'pdf' or r.content[:5] == b'%PDF-'
     blocos = pdf_blocos(r.content) if pdf else html_blocos(decodificar(r.content), url, n.get('corte'))
-    saida, sumario, plano = montar(blocos)
+    saida, sumario, plano = montar(recortar(blocos, n.get('inicio'), n.get('anexos')))
     if len(saida) < 3:
         raise RuntimeError('texto vazio ou irreconhecível')
     marcar_pos_edital(saida, plano.split('\n'), n.get('pos_edital', []))

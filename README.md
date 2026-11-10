@@ -24,6 +24,8 @@ Vade mecum de estudo para o concurso de **Analista Judiciário — Área Judici�
   - opção de ocultar o texto revogado e as notas de alteração;
   - layout para celular.
 
+Cada texto vai direto à redação da norma: ficam de fora a ementa, os "considerando", o decreto que promulga o tratado, o local e a data, as assinaturas e os anexos em tabela. O Preâmbulo da CF e os anexos da Res. CNJ 351 foram mantidos.
+
 ## Data de corte
 
 Os textos refletem a legislação vigente em **22/10/2026**. Todas as alterações de 2026 encontradas nas fontes (leis, ECs 139 a 141, resoluções CNJ e CSJT) foram conferidas e são anteriores a essa data.

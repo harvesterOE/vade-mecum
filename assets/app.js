@@ -592,11 +592,14 @@ function localizarGrifo(gr) {
   const i = +gr.i; if (!Number.isFinite(i)) return null;
   const p = $(`#txt p[data-i="${i}"]`);
   if (p && p.textContent.slice(gr.s, gr.e) === gr.t) return [p, gr.s, gr.e];
-  for (let d = 0; d <= 6; d++) for (const j of [i + d, i - d]) {  // texto mudou de posição: procura por perto
-    const q = $(`#txt p[data-i="${j}"]`), k = q && gr.t ? q.textContent.indexOf(gr.t) : -1;
-    if (k >= 0) return [q, k, k + gr.t.length];
+  if (!gr.t) return null;
+  // o texto mudou de posição (ex.: textos regerados): fica com a ocorrência mais próxima da posição antiga
+  let melhor = null;
+  for (const q of $$('#txt p[data-i]')) {
+    const k = q.textContent.indexOf(gr.t);
+    if (k >= 0 && (!melhor || Math.abs(+q.dataset.i - i) < Math.abs(+melhor[0].dataset.i - i))) melhor = [q, k, k + gr.t.length];
   }
-  return null;
+  return melhor;
 }
 function aplicarGrifos() {
   for (const gr of EST.grifos[estado.id] || []) {
